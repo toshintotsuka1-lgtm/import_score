@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>単語テスト採点</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #F2F2F7; color: #1C1C1E; min-height: 100vh; }
+
+  .header { background: #fff; border-bottom: 0.5px solid #C6C6C8; padding: 16px 20px 12px; position: sticky; top: 0; z-index: 100; }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header-sub { font-size: 13px; color: #8E8E93; margin-top: 2px; }
+
+  #status-bar { font-size: 12px; color: #8E8E93; padding: 6px 20px; background: #F2F2F7; }
+
+  .section { margin: 16px 0; }
+  .section-label { font-size: 13px; font-weight: 600; color: #6C6C70; text-transform: uppercase; letter-spacing: 0.5px; padding: 0 20px 6px; }
+  .section-card { background: #fff; border-radius: 12px; margin: 0 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+  .field { display: flex; align-items: center; padding: 14px 16px; border-bottom: 0.5px solid #E5E5EA; }
+  .field:last-child { border-bottom: none; }
+  .field-label { font-size: 15px; color: #1C1C1E; width: 100px; flex-shrink: 0; }
+  .field input { flex: 1; font-size: 17px; border: none; outline: none; background: transparent; color: #1C1C1E; text-align: right; }
+  .field input::placeholder { color: #C7C7CC; }
+
+  .btn { display: block; width: calc(100% - 32px); margin: 0 16px; padding: 16px; border: none; border-radius: 12px; font-size: 17px; font-weight: 600; cursor: pointer; text-align: center; transition: opacity 0.15s; }
+  .btn:active { opacity: 0.7; }
+  .btn-primary { background: #2563EB; color: #fff; }
+  .btn-success { background: #34C759; color: #fff; }
+  .btn-gray { background: #E5E5EA; color: #1C1C1E; }
+  .btn + .btn { margin-top: 10px; }
+
+  .msg { margin: 8px 16px; padding: 12px 16px; border-radius: 10px; font-size: 14px; line-height: 1.5; }
+  .msg-ok { background: #D1FAE5; color: #065F46; }
+  .msg-err { background: #FEE2E2; color: #991B1B; }
+  .msg-info { background: #DBEAFE; color: #1E40AF; }
+
+  /* 生徒番号バッジ（採点画面上部） */
+  .student-badge { display: flex; align-items: center; justify-content: space-between; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; margin: 0 16px 12px; padding: 10px 14px; }
+  .student-badge-label { font-size: 13px; color: #1D4ED8; }
+  .student-badge-num { font-size: 18px; font-weight: 700; color: #1D4ED8; font-family: monospace; letter-spacing: 1px; }
+  .student-badge-change { font-size: 13px; color: #2563EB; cursor: pointer; text-decoration: underline; }
+
+  .score-header { background: #fff; margin: 0 16px; border-radius: 12px 12px 0 0; padding: 14px 16px; border-bottom: 0.5px solid #E5E5EA; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .score-header-title { font-size: 17px; font-weight: 600; }
+  .score-header-sub { font-size: 13px; color: #8E8E93; margin-top: 3px; }
+
+  .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 0 16px; background: #fff; border-radius: 0 0 12px 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .score-item { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border-bottom: 0.5px solid #E5E5EA; border-right: 0.5px solid #E5E5EA; cursor: pointer; transition: background 0.1s; user-select: none; }
+  .score-item:nth-child(even) { border-right: none; }
+  .score-item.wrong { background: #FEE2E2; }
+  .score-item.wrong .score-word { color: #991B1B; }
+  .score-num { font-size: 12px; color: #8E8E93; width: 22px; text-align: right; flex-shrink: 0; }
+  .score-word { font-size: 15px; font-weight: 500; flex: 1; }
+  .score-check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #C7C7CC; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .score-item.wrong .score-check { background: #FF3B30; border-color: #FF3B30; }
+  .check-icon { display: none; color: #fff; font-size: 13px; font-weight: 700; }
+  .score-item.wrong .check-icon { display: block; }
+
+  .stats { display: flex; gap: 10px; margin: 12px 16px; }
+  .stat-box { flex: 1; background: #fff; border-radius: 10px; padding: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .stat-num { font-size: 24px; font-weight: 700; }
+  .stat-label { font-size: 12px; color: #8E8E93; margin-top: 2px; }
+  .stat-correct .stat-num { color: #34C759; }
+  .stat-wrong .stat-num { color: #FF3B30; }
+
+  .page { display: none; }
+  .page.active { display: block; padding-bottom: 40px; }
+  .spacer { height: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>単語テスト採点</h1>
+  <div class="header-sub" id="header-sub">生徒番号を入力してください</div>
+</div>
+<div id="status-bar">接続中...</div>
+
+<!-- ページ1: 生徒番号入力 -->
+<div id="page-student" class="page active">
+  <div class="section">
+    <div class="section-label">生徒番号</div>
+    <div class="section-card">
+      <div class="field">
+        <label class="field-label">生徒番号</label>
+        <input type="text" id="student-input" placeholder="1234567" maxlength="8"
+          inputmode="numeric" autocomplete="off">
+      </div>
+    </div>
+  </div>
+  <div id="student-msg"></div>
+  <button class="btn btn-primary" onclick="confirmStudent()">次へ</button>
+</div>
+
+<!-- ページ2: テストID入力 -->
+<div id="page-testid" class="page">
+  <div class="section">
+    <div class="section-label">生徒番号</div>
+    <div class="section-card">
+      <div class="field">
+        <label class="field-label">生徒番号</label>
+        <div id="student-display" style="flex:1;text-align:right;font-size:17px;font-family:monospace;font-weight:600;color:#2563EB;letter-spacing:1px;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-label">テストID</div>
+    <div class="section-card">
+      <div class="field">
+        <label class="field-label">テストID</label>
+        <input type="text" id="testid-input" placeholder="AB12345" maxlength="7"
+          style="text-transform:uppercase;font-family:monospace;font-size:20px;letter-spacing:3px;font-weight:700;"
+          inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="characters">
+      </div>
+    </div>
+  </div>
+  <div id="testid-msg"></div>
+  <button class="btn btn-primary" onclick="loadTest()">テストを読み込む</button>
+  <div class="spacer"></div>
+  <button class="btn btn-gray" onclick="backToStudent()">生徒番号を変更</button>
+</div>
+
+<!-- ページ3: 採点 -->
+<div id="page-score" class="page">
+  <div class="student-badge">
+    <div>
+      <div class="student-badge-label">生徒番号</div>
+      <div class="student-badge-num" id="badge-student"></div>
+    </div>
+    <span class="student-badge-change" onclick="backToStudent()">変更</span>
+  </div>
+  <div class="score-header">
+    <div class="score-header-title" id="score-title"></div>
+    <div class="score-header-sub">✕（間違い）の単語をタップしてください</div>
+  </div>
+  <div class="score-grid" id="score-grid"></div>
+  <div class="stats">
+    <div class="stat-box">
+      <div class="stat-num" id="stat-total">0</div>
+      <div class="stat-label">問題数</div>
+    </div>
+    <div class="stat-box stat-correct">
+      <div class="stat-num" id="stat-correct">0</div>
+      <div class="stat-label">正解</div>
+    </div>
+    <div class="stat-box stat-wrong">
+      <div class="stat-num" id="stat-wrong">0</div>
+      <div class="stat-label">不正解</div>
+    </div>
+  </div>
+  <div id="score-msg"></div>
+  <button class="btn btn-success" onclick="saveResult()">記録を保存</button>
+  <div class="spacer"></div>
+  <button class="btn btn-gray" onclick="backToTestId()">テストIDを変更</button>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://myheiqfjatxzwlsbrdvs.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15aGVpcWZqYXR4endsc2JyZHZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NzI1MDYsImV4cCI6MjA5MzU0ODUwNn0.FOY5b957WV-H6lOUbG2NDq6n3xVohK-7I7jxmg7Tfm4';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentStudent = '';
+let currentTest = null;
+let gradingQuestions = [];
+let wrongSet = new Set();
+
+async function init() {
+  try {
+    const { error } = await sb.from('wordbooks').select('id').limit(1);
+    if (error) throw error;
+    document.getElementById('status-bar').textContent = '接続OK';
+  } catch(e) {
+    document.getElementById('status-bar').textContent = '接続エラー: ' + e.message;
+  }
+}
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('page-' + name).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function showMsg(id, text, type) {
+  const el = document.getElementById(id);
+  el.innerHTML = '<div class="msg msg-' + type + '">' + text + '</div>';
+  if (type !== 'err') setTimeout(function() { el.innerHTML = ''; }, 4000);
+}
+
+// 生徒番号確定
+function confirmStudent() {
+  const val = document.getElementById('student-input').value.trim();
+  if (!val || val.length < 7 || val.length > 8 || !/^\d+$/.test(val)) {
+    return showMsg('student-msg', '7〜8桁の数字で入力してください', 'err');
+  }
+  currentStudent = val;
+  document.getElementById('student-display').textContent = val;
+  document.getElementById('badge-student').textContent = val;
+  document.getElementById('header-sub').textContent = '生徒番号: ' + val;
+  document.getElementById('testid-input').value = '';
+  document.getElementById('testid-msg').innerHTML = '';
+  showPage('testid');
+  setTimeout(function() { document.getElementById('testid-input').focus(); }, 300);
+}
+
+// テスト読み込み
+async function loadTest() {
+  const code = document.getElementById('testid-input').value.trim().toUpperCase();
+  if (code.length !== 7) return showMsg('testid-msg', 'テストIDは7文字で入力してください', 'err');
+
+  const { data: test } = await sb.from('tests').select('*').eq('test_code', code).single();
+  if (!test) return showMsg('testid-msg', 'テストが見つかりません', 'err');
+
+  const { data: tqs } = await sb.from('test_questions').select('*, words(*)').eq('test_id', test.id).order('position');
+  if (!tqs || !tqs.length) return showMsg('testid-msg', '問題の読み込みに失敗しました', 'err');
+
+  currentTest = test;
+  gradingQuestions = tqs;
+  wrongSet = new Set();
+
+  document.getElementById('score-title').textContent = 'テストID: ' + code + '　' + tqs.length + '問';
+  renderGrid();
+  updateStats();
+  showPage('score');
+}
+
+function renderGrid() {
+  document.getElementById('score-grid').innerHTML = gradingQuestions.map(function(q) {
+    const w = wrongSet.has(q.id);
+    return '<div class="score-item' + (w ? ' wrong' : '') + '" id="si-' + q.id + '" onclick="toggle(\'' + q.id + '\')">' +
+      '<span class="score-num">' + q.position + '</span>' +
+      '<span class="score-word">' + escHtml(q.words.english) + '</span>' +
+      '<span class="score-check"><span class="check-icon">✕</span></span>' +
+      '</div>';
+  }).join('');
+}
+
+function toggle(qId) {
+  const el = document.getElementById('si-' + qId);
+  if (wrongSet.has(qId)) { wrongSet.delete(qId); } else { wrongSet.add(qId); }
+  el.classList.toggle('wrong');
+  updateStats();
+}
+
+function updateStats() {
+  const total = gradingQuestions.length;
+  const wrong = wrongSet.size;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-correct').textContent = total - wrong;
+  document.getElementById('stat-wrong').textContent = wrong;
+}
+
+async function saveResult() {
+  // 重複チェック
+  const { data: existing } = await sb.from('student_results')
+    .select('id').eq('student_number', currentStudent).eq('test_id', currentTest.id).limit(1);
+  if (existing && existing.length > 0) {
+    if (!confirm('このテストの記録がすでに存在します。\n上書きして再保存しますか？')) return;
+    await sb.from('student_results').delete().eq('student_number', currentStudent).eq('test_id', currentTest.id);
+  }
+
+  const records = gradingQuestions.map(function(q) {
+    return { student_number: currentStudent, test_id: currentTest.id, word_id: q.word_id, is_correct: !wrongSet.has(q.id) };
+  });
+
+  const { error } = await sb.from('student_results').insert(records);
+  if (error) return showMsg('score-msg', 'エラー: ' + error.message, 'err');
+
+  const correct = records.filter(function(r) { return r.is_correct; }).length;
+  showMsg('score-msg', '保存しました（正解: ' + correct + '問 / 不正解: ' + wrongSet.size + '問）', 'ok');
+
+  // テストID入力に戻る（生徒番号はそのまま）
+  setTimeout(function() {
+    document.getElementById('testid-input').value = '';
+    document.getElementById('testid-msg').innerHTML = '';
+    showPage('testid');
+  }, 1500);
+}
+
+function backToStudent() {
+  document.getElementById('student-input').value = '';
+  document.getElementById('student-msg').innerHTML = '';
+  currentStudent = '';
+  document.getElementById('header-sub').textContent = '生徒番号を入力してください';
+  showPage('student');
+}
+
+function backToTestId() {
+  document.getElementById('testid-input').value = '';
+  document.getElementById('testid-msg').innerHTML = '';
+  showPage('testid');
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+init();
+</script>
+</body>
+</html>
