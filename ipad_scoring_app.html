@@ -52,7 +52,7 @@
   .score-item:nth-child(even) { border-right: none; }
   .score-item.wrong { background: #FEE2E2; }
   .score-item.wrong .score-word { color: #991B1B; }
-  .score-num { font-size: 12px; color: #8E8E93; width: 22px; text-align: right; flex-shrink: 0; }
+  .score-num { font-size: 11px; color: #8E8E93; width: 32px; text-align: right; flex-shrink: 0; }
   .score-word { font-size: 15px; font-weight: 500; flex: 1; }
   .score-check { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #C7C7CC; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
   .score-item.wrong .score-check { background: #FF3B30; border-color: #FF3B30; }
@@ -158,8 +158,8 @@
 </div>
 
 <script>
-const SUPABASE_URL = 'https://myheiqfjatxzwlsbrdvs.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15aGVpcWZqYXR4endsc2JyZHZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5NzI1MDYsImV4cCI6MjA5MzU0ODUwNn0.FOY5b957WV-H6lOUbG2NDq6n3xVohK-7I7jxmg7Tfm4';
+const SUPABASE_URL = 'https://cxraaewqxbbycjczfnef.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4cmFhZXdxeGJieWNqY3pmbmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNDcxMTgsImV4cCI6MjA5MzYyMzExOH0.sESHZbOrtrriqn1MX-Z0OKa5nGtPkPqqLqWlsiVZqik';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentStudent = '';
@@ -227,14 +227,31 @@ async function loadTest() {
 }
 
 function renderGrid() {
-  document.getElementById('score-grid').innerHTML = gradingQuestions.map(function(q) {
-    const w = wrongSet.has(q.id);
-    return '<div class="score-item' + (w ? ' wrong' : '') + '" id="si-' + q.id + '" onclick="toggle(\'' + q.id + '\')">' +
-      '<span class="score-num">' + q.position + '</span>' +
-      '<span class="score-word">' + escHtml(q.words.english) + '</span>' +
-      '<span class="score-check"><span class="check-icon">✕</span></span>' +
-      '</div>';
-  }).join('');
+  const left = gradingQuestions.slice(0, 25);
+  const right = gradingQuestions.slice(25);
+  const rows = Math.max(left.length, right.length);
+  let html = '';
+  for (let i = 0; i < rows; i++) {
+    if (left[i]) {
+      const q = left[i];
+      const w = wrongSet.has(q.id);
+      html += '<div class="score-item' + (w ? ' wrong' : '') + '" id="si-' + q.id + '" onclick="toggle(\'' + q.id + '\')">' +
+        '<span class="score-num">' + q.words.word_number + '</span>' +
+        '<span class="score-word">' + escHtml(q.words.english) + '</span>' +
+        '<span class="score-check"><span class="check-icon">✕</span></span>' +
+        '</div>';
+    }
+    if (right[i]) {
+      const q = right[i];
+      const w = wrongSet.has(q.id);
+      html += '<div class="score-item' + (w ? ' wrong' : '') + '" id="si-' + q.id + '" onclick="toggle(\'' + q.id + '\')">' +
+        '<span class="score-num">' + q.words.word_number + '</span>' +
+        '<span class="score-word">' + escHtml(q.words.english) + '</span>' +
+        '<span class="score-check"><span class="check-icon">✕</span></span>' +
+        '</div>';
+    }
+  }
+  document.getElementById('score-grid').innerHTML = html;
 }
 
 function toggle(qId) {
