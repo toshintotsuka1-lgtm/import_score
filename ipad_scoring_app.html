@@ -385,6 +385,10 @@ async function saveResult() {
   const correct = records.filter(function(r) { return r.is_correct; }).length;
   showMsg('score-msg', '保存しました（正解: ' + correct + '問 / 不正解: ' + wrongSet.size + '問）', 'ok');
 
+  // 習得進捗を更新
+  const { data: tqWb } = await sb.from('tests').select('wordbook_id').eq('id', currentTest.id).single();
+  if (tqWb) await updateMasteryProgress(currentStudent, currentTest.id, tqWb.wordbook_id);
+
   // テストID入力に戻る（生徒番号はそのまま）
   setTimeout(function() {
     document.getElementById('testid-input').value = '';
@@ -417,6 +421,55 @@ function showHelp() {
 }
 function hideHelp() {
   document.getElementById('help-overlay').classList.remove('active');
+}
+
+async function updateMasteryProgress(student, testId, wbId) {
+  if (!wbId) return;
+  const { data: results } = await sb.from('student_results')
+    .select('word_id, is_correct, words(wordbook_id)')
+    .eq('student_number', student)
+    .eq('test_id', testId);
+  if (!results || results.length === 0) return;
+
+  const wordIds = results.map(function(r) { return r.word_id; });
+  const { data: existingList } = await sb.from('mastery_progress')
+    .select('id, word_id, consecutive_correct')
+    .eq('student_number', student)
+    .eq('wordbook_id', wbId)
+    .in('word_id', wordIds);
+
+  const existingMap = {};
+  if (existingList) {
+    existingList.forEach(function(e) { existingMap[e.word_id] = e; });
+  }
+
+  const toInsert = [];
+  const toUpdate = [];
+
+  results.forEach(function(r) {
+    const wordWbId = r.words && r.words.wordbook_id;
+    if (!wordWbId) return;
+    const existing = existingMap[r.word_id];
+    if (existing) {
+      const newCount = r.is_correct ? (existing.consecutive_correct + 1) : 0;
+      toUpdate.push({ id: existing.id, consecutive_correct: newCount, updated_at: new Date().toISOString() });
+    } else {
+      toInsert.push({
+        student_number: student,
+        wordbook_id: wordWbId,
+        word_id: r.word_id,
+        consecutive_correct: r.is_correct ? 1 : 0
+      });
+    }
+  });
+
+  if (toInsert.length > 0) {
+    await sb.from('mastery_progress').insert(toInsert);
+  }
+  for (var i = 0; i < toUpdate.length; i++) {
+    var u = toUpdate[i];
+    await sb.from('mastery_progress').update({ consecutive_correct: u.consecutive_correct, updated_at: u.updated_at }).eq('id', u.id);
+  }
 }
 
 init();
